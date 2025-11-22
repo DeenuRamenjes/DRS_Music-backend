@@ -185,6 +185,14 @@ app.use((err, req, res, next) => {
 const PORT= process.env.PORT
 
 
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 httpServer.listen(PORT, '0.0.0.0', () => {
     console.log('================================');
     console.log(`Server is running on Port ${PORT}`);
