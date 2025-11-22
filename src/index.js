@@ -18,12 +18,22 @@ const app = express();
 const httpServer=createServer(app);
 initializeSocket(httpServer);
 
+// const allowedOrigins = [
+//     'http://localhost:4000',
+//     'http://127.0.0.1:4000',
+//     'http://localhost:5173',
+//     'http://127.0.0.1:5173',
+//     'https://spotify-chat-jqzp.onrender.com',
+// ];
+
 const allowedOrigins = [
     'http://localhost:4000',
     'http://127.0.0.1:4000',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'http://localhost:8081',  // Add this for Replit web testing
     'https://spotify-chat-jqzp.onrender.com',
+    'https://*.riker.replit.dev',  // Add this to whitelist all Replit dev domains
 ];
 
 if (process.env.LOCAL_IP) {
