@@ -34,6 +34,7 @@ const allowedOrigins = [
     'http://localhost:8081',  // Add this for Replit web testing
     'https://spotify-chat-jqzp.onrender.com',
     'https://*.riker.replit.dev',  // Add this to whitelist all Replit dev domains
+    'https://drs-music-xp1f.onrender.com/',
 ];
 
 if (process.env.LOCAL_IP) {
