@@ -6,11 +6,7 @@ let ioInstance;
 export const initializeSocket = (server) => {
     ioInstance = new Server(server, {
         cors:{
-            origin: [
-                'http://localhost:4000',
-                'http://localhost:5173',
-                'https://drs-music-xp1f.onrender.com'
-            ],
+            origin: 'http://localhost:4000',
             credentials: true
         }
     })

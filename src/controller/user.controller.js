@@ -102,3 +102,22 @@ export const unlikeSong = async (req, res, next) => {
     next(error);
   }
 };
+
+export const deleteUser = async (req, res, next) => {
+  try {
+    const clerkId = req.auth.userId;
+    const user = await User.findOne({ clerkId });
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Delete user from MongoDB
+    await User.findByIdAndDelete(user._id);
+    
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error in deleteUser', error);
+    next(error);
+  }
+};

@@ -18,21 +18,14 @@ const app = express();
 const httpServer=createServer(app);
 initializeSocket(httpServer);
 
-// const allowedOrigins = [
-//     'http://localhost:4000',
-//     'http://127.0.0.1:4000',
-//     'http://localhost:5173',
-//     'http://127.0.0.1:5173',
-//     'https://spotify-chat-jqzp.onrender.com',
-// ];
-
 const allowedOrigins = [
     'http://localhost:4000',
     'http://127.0.0.1:4000',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'http://localhost:8081',  // Add this for Replit web testing
     'https://spotify-chat-jqzp.onrender.com',
+    'https://drs-music-player.onrender.com',
+    'http://localhost:8081',
     'https://*.riker.replit.dev',  // Add this to whitelist all Replit dev domains
     'https://drs-music-xp1f.onrender.com', // Add this for the new Render URL,
     'https://drs-music-backend.onrender.com',
@@ -149,10 +142,7 @@ import adminRoute from './routes/admin.route.js';
 import songsRoute from './routes/songs.route.js';
 import albumRoute from './routes/album.route.js';
 import statsRoute from './routes/stats.route.js';
-
-
-
-
+import todoRoute from './routes/todo.routes.js';
 
 app.use('/api/users', userRoute);
 app.use('/api/auth', authRoute);
@@ -160,14 +150,14 @@ app.use('/api/admin', adminRoute);
 app.use('/api/songs', songsRoute);
 app.use('/api/album', albumRoute);
 app.use('/api/stats', statsRoute);
+app.use('/api/todos', todoRoute);
 
-
-// if(process.env.NODE_ENV === 'production'){
-//     app.use(express.static(path.join(__dirname, "../frontend/dist")));
-//     app.get("*",(req,res)=>{
-//         res.sendFile(path.join(__dirname, "../frontend","dist","index.html"));
-//     })
-// }
+if(process.env.NODE_ENV === 'production'){
+    app.use(express.static(path.join(__dirname, "../frontend/dist")));
+    app.get("*",(req,res)=>{
+        res.sendFile(path.join(__dirname, "../frontend","dist","index.html"));
+    })
+}
 
 
 
@@ -184,16 +174,8 @@ app.use((err, req, res, next) => {
 
 
 
-const PORT= process.env.PORT || 4000;
+const PORT= process.env.PORT
 
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
 
 httpServer.listen(PORT, '0.0.0.0', () => {
     console.log('================================');
