@@ -24,11 +24,7 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'https://spotify-chat-jqzp.onrender.com',
-    'https://drs-music-player.onrender.com',
-    'http://localhost:8081',
-    'https://*.riker.replit.dev',  // Add this to whitelist all Replit dev domains
-    'https://drs-music-xp1f.onrender.com', // Add this for the new Render URL,
-    'https://drs-music-backend.onrender.com',
+    'https://drs-music-player.onrender.com'
 ];
 
 if (process.env.LOCAL_IP) {

@@ -1,5 +1,6 @@
 import cloudinary from 'cloudinary';
 import dotenv from 'dotenv';
+import fs from 'fs';
 dotenv.config();
 
 cloudinary.v2.config({
@@ -15,18 +16,35 @@ export const uploadToCloudinary = async (file) => {
             resource_type: "auto",
             chunk_size: 20 * 1024 * 1024, // 20MB chunks
             timeout: 300000, // 5 minutes timeout
-            upload_preset: process.env.CLOUDINARY_UPLOAD_PRESET || 'ml_default'
         };
 
-        // For images, add quality and format optimization
-        if (file.mimetype.startsWith('image/')) {
+        // For images, add quality optimization
+        if (file.mimetype && file.mimetype.startsWith('image/')) {
             options.quality = 'auto';
-            options.format = 'auto';
         }
 
         const result = await cloudinary.v2.uploader.upload(file.tempFilePath, options);
+
+        // Clean up temp file after successful upload
+        try {
+            if (file.tempFilePath && fs.existsSync(file.tempFilePath)) {
+                fs.unlinkSync(file.tempFilePath);
+            }
+        } catch (cleanupError) {
+            console.error("Error cleaning up temp file:", cleanupError.message);
+        }
+
         return result.secure_url;
     } catch (error) {
+        // Clean up temp file even on error
+        try {
+            if (file.tempFilePath && fs.existsSync(file.tempFilePath)) {
+                fs.unlinkSync(file.tempFilePath);
+            }
+        } catch (cleanupError) {
+            console.error("Error cleaning up temp file:", cleanupError.message);
+        }
+
         if (error.http_code === 400 && error.message.includes('File size too large')) {
             throw new Error('File size exceeds Cloudinary limit. Please use a smaller file (max 10MB for free accounts).');
         }
