@@ -15,7 +15,7 @@ const __dirname = path.resolve();
 dotenv.config();
 const app = express();
 
-const httpServer=createServer(app);
+const httpServer = createServer(app);
 initializeSocket(httpServer);
 
 const allowedOrigins = [
@@ -80,7 +80,7 @@ app.use(fileUpload({
     useTempFiles: true,
     tempFileDir: tempDir,
     createParentPath: true,
-    limits: { 
+    limits: {
         fileSize: 50 * 1024 * 1024, // 50 MB
         files: 2 // Maximum number of files
     },
@@ -148,10 +148,15 @@ app.use('/api/album', albumRoute);
 app.use('/api/stats', statsRoute);
 app.use('/api/todos', todoRoute);
 
-if(process.env.NODE_ENV === 'production'){
+// Serve static files from public folder (songs, images, etc.)
+// __dirname in ESM is the project root (from path.resolve())
+// So public folder is directly at __dirname/public
+app.use(express.static(path.join(__dirname, 'public')));
+
+if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, "../frontend/dist")));
-    app.get("*",(req,res)=>{
-        res.sendFile(path.join(__dirname, "../frontend","dist","index.html"));
+    app.get("*", (req, res) => {
+        res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
     })
 }
 
@@ -161,8 +166,8 @@ if(process.env.NODE_ENV === 'production'){
 //error handling middleware
 app.use((err, req, res, next) => {
     console.error("Error in middleware", err.message);
-    res.status(500).json({ 
-        message:process.env.NODE_ENV === 'production' ? "Internal Server Error" : err.message,
+    res.status(500).json({
+        message: process.env.NODE_ENV === 'production' ? "Internal Server Error" : err.message,
     });
 })
 
@@ -170,7 +175,7 @@ app.use((err, req, res, next) => {
 
 
 
-const PORT= process.env.PORT
+const PORT = process.env.PORT
 
 
 httpServer.listen(PORT, '0.0.0.0', () => {
