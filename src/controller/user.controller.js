@@ -38,14 +38,30 @@ export const getMessages = async (req, res, next) => {
   }
 }
 
-const findUserByClerkId = async (clerkId) => {
-  return User.findOne({ clerkId }).populate('likedSongs');
+// Helper function to find user - supports both Clerk ID and MongoDB _id
+const findUserByIdOrClerkId = async (id, populate = null) => {
+  // Try by clerkId first
+  let user = await User.findOne({ clerkId: id });
+
+  // If not found, try by MongoDB _id (for mobile users)
+  if (!user) {
+    try {
+      const query = User.findById(id);
+      user = populate ? await query.populate(populate) : await query;
+    } catch (e) {
+      // Invalid ObjectId format, ignore
+    }
+  } else if (populate) {
+    await user.populate(populate);
+  }
+
+  return user;
 };
 
 export const getLikedSongs = async (req, res, next) => {
   try {
-    const clerkId = req.auth.userId;
-    const user = await findUserByClerkId(clerkId);
+    const userId = req.auth.userId;
+    const user = await findUserByIdOrClerkId(userId, 'likedSongs');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -58,9 +74,9 @@ export const getLikedSongs = async (req, res, next) => {
 
 export const likeSong = async (req, res, next) => {
   try {
-    const clerkId = req.auth.userId;
+    const userId = req.auth.userId;
     const { songId } = req.params;
-    const user = await User.findOne({ clerkId });
+    const user = await findUserByIdOrClerkId(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -86,9 +102,9 @@ export const likeSong = async (req, res, next) => {
 
 export const unlikeSong = async (req, res, next) => {
   try {
-    const clerkId = req.auth.userId;
+    const userId = req.auth.userId;
     const { songId } = req.params;
-    const user = await User.findOne({ clerkId });
+    const user = await findUserByIdOrClerkId(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -140,8 +156,8 @@ export const getLastSeenData = async (req, res, next) => {
 // Get user settings
 export const getSettings = async (req, res, next) => {
   try {
-    const clerkId = req.auth.userId;
-    const user = await User.findOne({ clerkId });
+    const userId = req.auth.userId;
+    const user = await findUserByIdOrClerkId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -192,14 +208,14 @@ export const getSettings = async (req, res, next) => {
 // Update user settings
 export const updateSettings = async (req, res, next) => {
   try {
-    const clerkId = req.auth.userId;
+    const userId = req.auth.userId;
     const { settings } = req.body;
 
     if (!settings) {
       return res.status(400).json({ message: 'Settings data is required' });
     }
 
-    const user = await User.findOne({ clerkId });
+    const user = await findUserByIdOrClerkId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -242,10 +258,10 @@ export const updateSettings = async (req, res, next) => {
 // Update specific playback settings (for quick updates like shuffle/loop)
 export const updatePlaybackSettings = async (req, res, next) => {
   try {
-    const clerkId = req.auth.userId;
+    const userId = req.auth.userId;
     const { shuffle, loop, volume } = req.body;
 
-    const user = await User.findOne({ clerkId });
+    const user = await findUserByIdOrClerkId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

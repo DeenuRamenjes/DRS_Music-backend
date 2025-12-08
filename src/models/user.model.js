@@ -6,9 +6,16 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    email: {
+        type: String,
+        required: false,  // Optional for Clerk users, required for mobile users
+        sparse: true,     // Allows multiple nulls
+        index: true
+    },
     image: {
         type: String,
-        required: true
+        required: false,
+        default: ''
     },
     clerkId: {
         type: String,

@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { authCallback } from "../controller/auth.controller.js";
+import { authCallback, mobileAuth } from "../controller/auth.controller.js";
 
 const router = Router();
 
 
-router.post("/callback",authCallback)
+router.post("/callback", authCallback);
+router.post("/mobile", mobileAuth);
 
 
 export default router;
