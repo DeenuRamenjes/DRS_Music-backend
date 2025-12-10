@@ -140,6 +140,15 @@ import albumRoute from './routes/album.route.js';
 import statsRoute from './routes/stats.route.js';
 import todoRoute from './routes/todo.routes.js';
 
+// Health check endpoint (for mobile app connection check)
+app.get('/api/health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
 app.use('/api/users', userRoute);
 app.use('/api/auth', authRoute);
 app.use('/api/admin', adminRoute);

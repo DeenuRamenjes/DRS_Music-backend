@@ -17,9 +17,17 @@ export const getAllUsers = async (req, res, next) => {
 
 export const getMessages = async (req, res, next) => {
   try {
-    const myId = req.auth.userId
+    // For mobile users, we need to use clerkId
+    let myId = req.auth.userId;
 
-    const { userId } = req.params
+    // If this is a mobile user, get their clerkId
+    if (req.mobileUser) {
+      myId = req.mobileUser.clerkId;
+    }
+
+    const { userId } = req.params;
+
+    console.log('📨 getMessages - myId:', myId, 'userId:', userId);
 
     const messages = await Message.find({
       $or: [{
@@ -30,11 +38,13 @@ export const getMessages = async (req, res, next) => {
         receiverId: userId
       }
       ]
-    }).sort({ createdAt: 1 })
-    res.status(200).json(messages)
+    }).sort({ createdAt: 1 });
+
+    console.log('📨 Found messages:', messages.length);
+    res.status(200).json(messages);
   } catch (error) {
     console.error("Error in getMessages", error);
-    next(error)
+    next(error);
   }
 }
 

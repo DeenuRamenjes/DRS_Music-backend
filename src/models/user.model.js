@@ -8,8 +8,9 @@ const userSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        required: false,  // Optional for Clerk users, required for mobile users
-        sparse: true,     // Allows multiple nulls
+        required: false,  // Optional for Clerk users without email
+        sparse: true,     // Allows multiple nulls/empty strings
+        unique: true,     // Prevent duplicate emails
         index: true
     },
     image: {

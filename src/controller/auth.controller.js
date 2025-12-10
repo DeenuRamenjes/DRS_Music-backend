@@ -6,49 +6,125 @@ export const authCallback = async (req, res) => {
     try {
         const { id, firstName, lastName, imageUrl } = req.body;
 
-        // Check if user already exists
-        const user = await User.findOne({ clerkId: id });
+        // Check if user already exists by clerkId
+        let user = await User.findOne({ clerkId: id });
+
         if (!user) {
             // Create new user
-            await User.create({
+            user = await User.create({
                 clerkId: id,
-                name: `${firstName || ""} ${lastName || ""}`.trim(),
-                image: imageUrl
+                name: `${firstName || ""} ${lastName || ""}`.trim() || 'User',
+                image: imageUrl || ''
             });
+            console.log('✅ New user created via authCallback:', id);
+        } else {
+            // Update existing user info if provided
+            if (imageUrl && user.image !== imageUrl) {
+                user.image = imageUrl;
+            }
+            const newName = `${firstName || ""} ${lastName || ""}`.trim();
+            if (newName && user.name !== newName) {
+                user.name = newName;
+            }
+            await user.save();
+            console.log('✅ Existing user updated via authCallback:', id);
         }
-        res.status(200).json({ success: true, message: "User Created" });
+
+        res.status(200).json({ success: true, message: "User synced" });
     } catch (error) {
-        console.log("Error in creating user", error);
+        console.log("Error in authCallback:", error);
         res.status(500).json({ success: false, message: "Error in creating user" });
     }
 };
 
-// Mobile auth - for development/testing only
-// In production, you would use proper Clerk mobile SDK
+// Mobile auth - handles both Clerk WebView users and demo/email users
 export const mobileAuth = async (req, res) => {
     try {
-        const { email, name, imageUrl } = req.body;
+        const { email, name, imageUrl, clerkId } = req.body;
 
-        if (!email) {
-            return res.status(400).json({ success: false, message: "Email is required" });
+        if (!email && !clerkId) {
+            return res.status(400).json({ success: false, message: "Email or ClerkId is required" });
         }
 
-        // Find or create user by email
-        let user = await User.findOne({ email });
+        let user = null;
 
+        // PRIORITY ORDER FOR FINDING EXISTING USERS:
+        // 1. By clerkId (if provided) - most specific
+        // 2. By email (if provided) - fallback
+
+        if (clerkId) {
+            // First, try to find by exact clerkId
+            user = await User.findOne({ clerkId });
+            console.log('🔍 Search by clerkId:', clerkId, '- Found:', !!user);
+        }
+
+        // If not found by clerkId, try email
+        if (!user && email) {
+            user = await User.findOne({ email });
+            console.log('🔍 Search by email:', email, '- Found:', !!user);
+
+            // If found by email but has different clerkId, update it
+            if (user && clerkId && user.clerkId !== clerkId) {
+                // Only update if the existing clerkId looks like a mobile temp ID
+                // Don't overwrite real Clerk IDs
+                if (user.clerkId.startsWith('mobile_')) {
+                    console.log('🔄 Updating clerkId from', user.clerkId, 'to', clerkId);
+                    user.clerkId = clerkId;
+                    await user.save();
+                } else {
+                    console.log('⚠️ User exists with different clerkId:', user.clerkId, '- keeping existing');
+                    // Keep using the existing user, don't update clerkId
+                }
+            }
+        }
+
+        // Create new user only if not found by clerkId OR email
         if (!user) {
-            // Create new user with email as clerkId (for mobile)
-            user = await User.create({
-                clerkId: 'mobile_' + Date.now(),
-                email: email,
-                name: name || email.split('@')[0],
-                image: imageUrl || ''
-            });
+            const newClerkId = clerkId || 'mobile_' + Date.now();
+            const newName = name || (email ? email.split('@')[0] : 'User');
+
+            // Double-check no user with this email exists (race condition prevention)
+            if (email) {
+                const existingByEmail = await User.findOne({ email });
+                if (existingByEmail) {
+                    user = existingByEmail;
+                    console.log('⚠️ Found existing user by email in double-check:', email);
+                }
+            }
+
+            if (!user) {
+                user = await User.create({
+                    clerkId: newClerkId,
+                    email: email || '',
+                    name: newName,
+                    image: imageUrl || ''
+                });
+                console.log('✅ New user created:', newClerkId, email);
+            }
+        } else {
+            // Update existing user info if provided
+            let updated = false;
+            if (name && user.name !== name && user.name === 'User') {
+                user.name = name;
+                updated = true;
+            }
+            if (imageUrl && user.image !== imageUrl) {
+                user.image = imageUrl;
+                updated = true;
+            }
+            if (email && !user.email) {
+                user.email = email;
+                updated = true;
+            }
+            if (updated) {
+                await user.save();
+                console.log('✅ User info updated:', user.clerkId);
+            }
         }
 
         // Check if user is admin
         const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
-        const isAdmin = adminEmails.includes(email);
+        const isAdmin = adminEmails.includes(user.email);
 
         res.status(200).json({
             success: true,
@@ -64,7 +140,55 @@ export const mobileAuth = async (req, res) => {
             token: 'mobile_session_' + user._id
         });
     } catch (error) {
-        console.log("Error in mobile auth", error);
+        console.log("Error in mobile auth:", error);
         res.status(500).json({ success: false, message: "Error in mobile auth" });
+    }
+};
+
+// Get current user - for session verification
+export const getMe = async (req, res) => {
+    try {
+        // For mobile users, we have mobileUser set by auth middleware
+        if (req.mobileUser) {
+            const user = req.mobileUser;
+            const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+            const isAdmin = adminEmails.includes(user.email);
+
+            return res.status(200).json({
+                _id: user._id,
+                id: user._id,
+                clerkId: user.clerkId,
+                email: user.email,
+                name: user.name,
+                imageUrl: user.image,
+                createdAt: user.createdAt,
+                isAdmin
+            });
+        }
+
+        // For Clerk users, get from auth userId
+        if (req.auth?.userId) {
+            const user = await User.findOne({ clerkId: req.auth.userId });
+            if (user) {
+                const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+                const isAdmin = adminEmails.includes(user.email);
+
+                return res.status(200).json({
+                    _id: user._id,
+                    id: user._id,
+                    clerkId: user.clerkId,
+                    email: user.email,
+                    name: user.name,
+                    imageUrl: user.image,
+                    createdAt: user.createdAt,
+                    isAdmin
+                });
+            }
+        }
+
+        return res.status(401).json({ message: "Not authenticated" });
+    } catch (error) {
+        console.log("Error in getMe:", error);
+        res.status(500).json({ message: "Internal server error" });
     }
 };
