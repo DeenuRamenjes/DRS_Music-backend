@@ -1,4 +1,5 @@
 import { Song } from "../models/song.model.js";
+import { User } from "../models/user.model.js";
 import { Album } from "../models/album.model.js";
 import { uploadToCloudinary } from '../lib/cloudinary.js';
 import multer from 'multer';
@@ -84,22 +85,21 @@ const extractAlbumIds = (body) => {
 
 export const createSong = async (req, res, next) => {
     try {
-        if (!req.files || !req.files.audioFile || !req.files.imageFile) {
-            return res.status(400).json({ message: "Please upload both audio and image files" });
+        if (!req.files || !req.files.audioFile) {
+            return res.status(400).json({ message: "Please upload an audio file" });
         }
 
-        const { title, artist, duration } = req.body;
+        const { title, artist, duration, generatePlaceholder } = req.body;
         const albumIds = extractAlbumIds(req.body) ?? [];
         if (!title || !artist || !duration) {
             return res.status(400).json({ message: "Please provide all required fields" });
         }
 
         const audioFile = req.files.audioFile;
-        const imageFile = req.files.imageFile;
+        const imageFile = req.files?.imageFile;
 
-        // Validate file types
+        // Validate audio file type
         const allowedAudioTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg'];
-        const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
 
         if (!allowedAudioTypes.includes(audioFile.mimetype)) {
             return res.status(400).json({
@@ -107,29 +107,111 @@ export const createSong = async (req, res, next) => {
             });
         }
 
-        if (!allowedImageTypes.includes(imageFile.mimetype)) {
-            return res.status(400).json({
-                message: "Invalid image file type. Please upload JPEG, JPG, or PNG images."
-            });
-        }
-
         // Validate file sizes
         const maxAudioSize = 50 * 1024 * 1024; // 50MB
-        const maxImageSize = 10 * 1024 * 1024; // 10MB for Cloudinary free tier
+        const maxImageSize = 10 * 1024 * 1024; // 10MB
 
         if (audioFile.size > maxAudioSize) {
             return res.status(400).json({
                 message: "Audio file is too large. Maximum size is 50MB."
             });
         }
-        if (imageFile.size > maxImageSize) {
-            return res.status(400).json({
-                message: "Image file is too large. Maximum size is 10MB for Cloudinary free tier. Please compress the image before uploading."
-            });
-        }
 
-        const audioUrl = await uploadToCloudinary(audioFile);
-        const imageUrl = await uploadToCloudinary(imageFile);
+        let audioUrl, imageUrl;
+
+        // Upload audio file
+        audioUrl = await uploadToCloudinary(audioFile);
+
+        // Handle image - either upload provided image or generate placeholder
+        if (imageFile) {
+            const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+            if (!allowedImageTypes.includes(imageFile.mimetype)) {
+                return res.status(400).json({
+                    message: "Invalid image file type. Please upload JPEG, JPG, or PNG images."
+                });
+            }
+            if (imageFile.size > maxImageSize) {
+                return res.status(400).json({
+                    message: "Image file is too large. Maximum size is 10MB."
+                });
+            }
+            imageUrl = await uploadToCloudinary(imageFile);
+        } else if (generatePlaceholder === 'true') {
+            // Generate placeholder image using canvas (same as web app)
+            try {
+                const { createCanvas } = await import('canvas');
+                const canvas = createCanvas(640, 640);
+                const ctx = canvas.getContext('2d');
+
+                // Generate random colors (matching web app's createPlaceholderArtwork)
+                const baseHue = Math.floor(Math.random() * 360);
+                const gradient = ctx.createLinearGradient(0, 0, 640, 640);
+                gradient.addColorStop(0, `hsl(${baseHue}, 70%, 20%)`);
+                gradient.addColorStop(1, `hsl(${(baseHue + 45) % 360}, 70%, 45%)`);
+
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 640, 640);
+
+                // Add decorative circles
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+                for (let i = 0; i < 6; i++) {
+                    ctx.beginPath();
+                    ctx.arc(
+                        Math.random() * 640,
+                        Math.random() * 640,
+                        80 + Math.random() * 120,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+
+                // Add title text
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 44px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const displayTitle = title.length > 25 ? title.slice(0, 25) + '...' : title;
+                ctx.fillText(displayTitle, 320, 300);
+
+                // Add artist text
+                const artistHue = (baseHue + 20) % 360;
+                ctx.fillStyle = `hsl(${artistHue}, 60%, 80%)`;
+                ctx.font = '24px sans-serif';
+                const displayArtist = artist.length > 35 ? artist.slice(0, 35) + '...' : artist;
+                ctx.fillText(displayArtist, 320, 360);
+
+                // Convert canvas to buffer and save to temp file
+                const buffer = canvas.toBuffer('image/png');
+                const tempDir = path.join(process.cwd(), 'tmp');
+                const tempPath = path.join(tempDir, `placeholder_${Date.now()}.png`);
+
+                // Ensure tmp directory exists
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
+
+                fs.writeFileSync(tempPath, buffer);
+
+                // Upload the placeholder image to Cloudinary
+                const placeholderFile = {
+                    tempFilePath: tempPath,
+                    mimetype: 'image/png',
+                    size: buffer.length
+                };
+                imageUrl = await uploadToCloudinary(placeholderFile);
+
+                // Clean up temp file
+                try { fs.unlinkSync(tempPath); } catch (e) { /* ignore */ }
+            } catch (canvasError) {
+                console.error('Canvas error:', canvasError);
+                return res.status(400).json({
+                    message: "Please upload a cover image (placeholder generation failed)"
+                });
+            }
+        } else {
+            return res.status(400).json({ message: "Please upload a cover image" });
+        }
 
         const song = new Song({
             title,
@@ -381,17 +463,27 @@ export const sendBroadcastNotification = async (req, res, next) => {
 
         const payload = {
             id: Date.now().toString(),
-            title,
+            title: title || 'DRS Music',
             message,
             imageUrl,
             link,
             createdAt: new Date().toISOString(),
         };
 
-        console.log("Emitting broadcast_notification to all clients:", payload);
+        // Get connected clients count
+        const connectedSockets = await io.fetchSockets();
+        const connectedCount = connectedSockets.length;
+
+        console.log(`📢 Broadcasting notification to ${connectedCount} connected clients:`, payload);
         io.emit("broadcast_notification", payload);
-        return res.status(200).json({ message: "Notification sent" });
+
+        return res.status(200).json({
+            message: "Notification sent",
+            payload,
+            connectedClients: connectedCount
+        });
     } catch (error) {
+        console.error("Error sending broadcast notification:", error);
         next(error);
     }
 };
@@ -870,6 +962,102 @@ export const assignSongsToAlbum = async (req, res, next) => {
         });
     } catch (error) {
         console.error("Error assigning songs to album", error);
+        next(error);
+    }
+};
+
+// ==================== USER MANAGEMENT ====================
+
+// Get all users for admin
+export const getAllUsersAdmin = async (req, res, next) => {
+    try {
+        const users = await User.find({})
+            .select('-settings.playback -settings.downloads')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            message: "Users fetched successfully",
+            users,
+            count: users.length
+        });
+    } catch (error) {
+        console.error("Error fetching users for admin", error);
+        next(error);
+    }
+};
+
+// Get single user by ID
+export const getUserByIdAdmin = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const user = await User.findById(id);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json({
+            message: "User fetched successfully",
+            user
+        });
+    } catch (error) {
+        console.error("Error fetching user for admin", error);
+        next(error);
+    }
+};
+
+// Update user (admin)
+export const updateUserAdmin = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { name, email, image } = req.body;
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Update fields if provided
+        if (name !== undefined) user.name = name;
+        if (email !== undefined) user.email = email;
+
+        // Handle image upload if provided
+        if (req.files?.imageFile) {
+            const imageUrl = await uploadToCloudinary(req.files.imageFile);
+            user.image = imageUrl;
+        } else if (image !== undefined) {
+            user.image = image;
+        }
+
+        const updatedUser = await user.save();
+
+        res.status(200).json({
+            message: "User updated successfully",
+            user: updatedUser
+        });
+    } catch (error) {
+        console.error("Error updating user", error);
+        next(error);
+    }
+};
+
+// Delete user (admin)
+export const deleteUserAdmin = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        await User.findByIdAndDelete(id);
+
+        res.status(200).json({
+            message: "User deleted successfully"
+        });
+    } catch (error) {
+        console.error("Error deleting user", error);
         next(error);
     }
 };
