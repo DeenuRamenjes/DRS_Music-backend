@@ -27,7 +27,6 @@ export const getMessages = async (req, res, next) => {
 
     const { userId } = req.params;
 
-    console.log('📨 getMessages - myId:', myId, 'userId:', userId);
 
     const messages = await Message.find({
       $or: [{
@@ -40,7 +39,6 @@ export const getMessages = async (req, res, next) => {
       ]
     }).sort({ createdAt: 1 });
 
-    console.log('📨 Found messages:', messages.length);
     res.status(200).json(messages);
   } catch (error) {
     console.error("Error in getMessages", error);

@@ -143,7 +143,6 @@ const seedSongs = async () => {
 		// Insert new songs
 		await Song.insertMany(songs);
 
-		console.log("Songs seeded successfully!");
 	} catch (error) {
 		console.error("Error seeding songs:", error);
 	} finally {

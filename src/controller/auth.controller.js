@@ -16,7 +16,6 @@ export const authCallback = async (req, res) => {
                 name: `${firstName || ""} ${lastName || ""}`.trim() || 'User',
                 image: imageUrl || ''
             });
-            console.log('✅ New user created via authCallback:', id);
         } else {
             // Update existing user info if provided
             if (imageUrl && user.image !== imageUrl) {
@@ -27,12 +26,10 @@ export const authCallback = async (req, res) => {
                 user.name = newName;
             }
             await user.save();
-            console.log('✅ Existing user updated via authCallback:', id);
         }
 
         res.status(200).json({ success: true, message: "User synced" });
     } catch (error) {
-        console.log("Error in authCallback:", error);
         res.status(500).json({ success: false, message: "Error in creating user" });
     }
 };
@@ -55,24 +52,20 @@ export const mobileAuth = async (req, res) => {
         if (clerkId) {
             // First, try to find by exact clerkId
             user = await User.findOne({ clerkId });
-            console.log('🔍 Search by clerkId:', clerkId, '- Found:', !!user);
         }
 
         // If not found by clerkId, try email
         if (!user && email) {
             user = await User.findOne({ email });
-            console.log('🔍 Search by email:', email, '- Found:', !!user);
 
             // If found by email but has different clerkId, update it
             if (user && clerkId && user.clerkId !== clerkId) {
                 // Only update if the existing clerkId looks like a mobile temp ID
                 // Don't overwrite real Clerk IDs
                 if (user.clerkId.startsWith('mobile_')) {
-                    console.log('🔄 Updating clerkId from', user.clerkId, 'to', clerkId);
                     user.clerkId = clerkId;
                     await user.save();
                 } else {
-                    console.log('⚠️ User exists with different clerkId:', user.clerkId, '- keeping existing');
                     // Keep using the existing user, don't update clerkId
                 }
             }
@@ -88,7 +81,6 @@ export const mobileAuth = async (req, res) => {
                 const existingByEmail = await User.findOne({ email });
                 if (existingByEmail) {
                     user = existingByEmail;
-                    console.log('⚠️ Found existing user by email in double-check:', email);
                 }
             }
 
@@ -99,7 +91,6 @@ export const mobileAuth = async (req, res) => {
                     name: newName,
                     image: imageUrl || ''
                 });
-                console.log('✅ New user created:', newClerkId, email);
             }
         } else {
             // Update existing user info if provided
@@ -118,7 +109,6 @@ export const mobileAuth = async (req, res) => {
             }
             if (updated) {
                 await user.save();
-                console.log('✅ User info updated:', user.clerkId);
             }
         }
 
@@ -140,7 +130,6 @@ export const mobileAuth = async (req, res) => {
             token: 'mobile_session_' + user._id
         });
     } catch (error) {
-        console.log("Error in mobile auth:", error);
         res.status(500).json({ success: false, message: "Error in mobile auth" });
     }
 };
@@ -188,7 +177,7 @@ export const getMe = async (req, res) => {
 
         return res.status(401).json({ message: "Not authenticated" });
     } catch (error) {
-        console.log("Error in getMe:", error);
+        console.error("Error in getMe:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 };

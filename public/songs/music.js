@@ -138,8 +138,6 @@ const seedSongs = async () => {
 		await mongoose.connect(process.env.MONGODB_URI);
 		// Insert new songs
 		await Song.insertMany(songs);
-
-		console.log("Songs seeded successfully!");
 	} catch (error) {
 		console.error("Error seeding songs:", error);
 	} finally {

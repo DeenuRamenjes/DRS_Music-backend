@@ -474,7 +474,6 @@ export const sendBroadcastNotification = async (req, res, next) => {
         const connectedSockets = await io.fetchSockets();
         const connectedCount = connectedSockets.length;
 
-        console.log(`📢 Broadcasting notification to ${connectedCount} connected clients:`, payload);
         io.emit("broadcast_notification", payload);
 
         return res.status(200).json({
@@ -490,7 +489,6 @@ export const sendBroadcastNotification = async (req, res, next) => {
 
 export const checkAdmin = async (req, res, next) => {
     res.status(200).json({ admin: true });
-    // console.log("Admin check successful")
 }
 
 export const processAudioForLyrics = async (req, res, next) => {
@@ -545,7 +543,6 @@ export const processAudioForLyrics = async (req, res, next) => {
 
             // Check if lyrics were actually generated
             if (!transcribedLyrics || transcribedLyrics.trim() === '') {
-                console.log('No lyrics generated, transcription was empty');
                 return res.status(200).json({
                     message: "Audio processed but no lyrics detected",
                     lyrics: null,
@@ -645,7 +642,6 @@ const transcribeAudioFile = async (filePath) => {
         }
 
         if (transcriptionResult.status !== 'completed') {
-            console.log('AssemblyAI transcription timed out, using fallback');
             return await processAudioWithRealSTT(fs.readFileSync(filePath), filePath);
         }
 
@@ -690,17 +686,12 @@ const transcribeAudioFile = async (filePath) => {
         try {
             // Note: AssemblyAI doesn't have a direct delete method in the current SDK version
         } catch (cleanupError) {
-            console.log('Note about AssemblyAI file cleanup:', cleanupError.message);
         }
 
-        console.log('Final transcript length:', formattedTranscript.length);
         return formattedTranscript.trim();
     } catch (error) {
         console.error('AssemblyAI transcription failed:', error);
         console.error('Error details:', error.message);
-
-        // Fallback to local processing if AssemblyAI fails
-        console.log('Falling back to local transcription...');
         return await processAudioWithRealSTT(fs.readFileSync(filePath), filePath);
     }
 };
@@ -724,11 +715,8 @@ const processAudioWithRealSTT = async (audioBuffer, filePath) => {
 
             // If duration is 0 or invalid, use a fallback duration
             if (duration <= 0 || isNaN(duration)) {
-                console.log('Invalid duration detected, using fallback');
                 duration = 180; // 3 minutes default for songs
             }
-
-            console.log('Using duration:', duration, 'seconds');
 
             // Generate transcription based on actual audio properties
             const transcription = await analyzeAudioContent(filePath, duration, audioBuffer.length);
@@ -736,7 +724,6 @@ const processAudioWithRealSTT = async (audioBuffer, filePath) => {
             return transcription;
 
         } catch (ffmpegError) {
-            console.log('FFmpeg not available, using basic audio analysis');
 
             // Fallback: Basic file analysis without FFmpeg
             const stats = fs.statSync(filePath);

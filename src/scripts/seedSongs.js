@@ -29,11 +29,9 @@ const getRandomCoverImage = () => {
 const seedSongs = async () => {
     try {
         await mongoose.connect(process.env.MONGODB_URI);
-        console.log('Connected to MongoDB');
 
         // Clear existing songs
         await Song.deleteMany({});
-        console.log('Cleared existing songs');
 
         // Get all MP3 files from the songs directory
         const files = fs.readdirSync(SONGS_DIR);
@@ -75,13 +73,11 @@ const seedSongs = async () => {
 
         // Insert songs into database
         await Song.insertMany(songs);
-        console.log(`Successfully seeded ${songs.length} songs`);
 
     } catch (error) {
         console.error('Error seeding songs:', error);
     } finally {
         await mongoose.connection.close();
-        console.log('Disconnected from MongoDB');
     }
 };
 
