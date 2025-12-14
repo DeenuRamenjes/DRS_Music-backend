@@ -12,7 +12,7 @@ const updateAndEmitLastSeen = async (userId, createIfMissing = false) => {
         }
 
         const existingUser = await User.findOne(query);
-        
+
         if (existingUser || createIfMissing) {
             await User.findOneAndUpdate(
                 { clerkId: userId },
@@ -88,13 +88,28 @@ export const initializeSocket = (server) => {
 
         socket.on("send_message", async (data) => {
             try {
-                const { senderId, receiverId, content } = data
+                const { senderId, receiverId, content, messageType, songData } = data
 
-                const message = await Message.create({
+                const messageData = {
                     senderId,
                     receiverId,
                     content
-                })
+                };
+
+                // Add song data if it's a song message
+                if (messageType === 'song' && songData) {
+                    messageData.messageType = 'song';
+                    messageData.songData = {
+                        songId: songData.songId,
+                        title: songData.title,
+                        artist: songData.artist,
+                        imageUrl: songData.imageUrl,
+                        audioUrl: songData.audioUrl,
+                        duration: songData.duration
+                    };
+                }
+
+                const message = await Message.create(messageData)
 
                 const receiverSocketId = userSockets.get(receiverId);
                 if (receiverSocketId) {

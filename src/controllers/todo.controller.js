@@ -2,59 +2,81 @@ import { Todo } from '../models/todo.model.js';
 import { User } from '../models/user.model.js';
 import asyncHandler from '../middleware/asyncHandler.js';
 import { protectRoute } from '../middleware/auth.middleware.js';
+import mongoose from 'mongoose';
 
 // Helper function to get user from database
-const getUserFromAuth = async (clerkUserId) => {
-    const user = await User.findOne({ clerkId: clerkUserId });
+// Handles both mobile users (userId is MongoDB ObjectId) and Clerk users (userId is clerkId)
+const getUserFromAuth = async (userId, mobileUser) => {
+    // If mobileUser is available, use it directly
+    if (mobileUser) {
+        return mobileUser;
+    }
+
+    // Check if userId is a valid MongoDB ObjectId
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+        // Try finding by _id first (for mobile users)
+        let user = await User.findById(userId);
+        if (user) return user;
+    }
+
+    // Fall back to finding by clerkId (for Clerk users)
+    const user = await User.findOne({ clerkId: userId });
     if (!user) {
         throw new Error('User not found in database');
     }
     return user;
 };
 
-// Get all todos for the authenticated user
+// Get all todos from all users (Admin view)
 export const getTodos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 20, completed, priority, category } = req.query;
-    
-    const user = await getUserFromAuth(req.auth.userId);
-    const filter = { createdBy: user._id };
-    
-    if (completed !== undefined) {
-        filter.completed = completed === 'true';
-    }
-    
-    if (priority) {
-        filter.priority = priority;
-    }
-    
-    if (category) {
-        filter.category = category;
-    }
+    try {
 
-    const todos = await Todo.find(filter)
-        .sort({ priority: -1, createdAt: -1 })
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .exec();
+        const { page = 1, limit = 50, completed, priority, category } = req.query;
 
-    const total = await Todo.countDocuments(filter);
+        // Build filter (no user restriction - show all todos)
+        const filter = {};
 
-    res.json({
-        todos,
-        pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            pages: Math.ceil(total / limit)
+        if (completed !== undefined) {
+            filter.completed = completed === 'true';
         }
-    });
+
+        if (priority) {
+            filter.priority = priority;
+        }
+
+        if (category) {
+            filter.category = category;
+        }
+
+        const todos = await Todo.find(filter)
+            .populate('createdBy', 'fullName imageUrl email')
+            .sort({ priority: -1, createdAt: -1 })
+            .limit(limit * 1)
+            .skip((page - 1) * limit)
+            .exec();
+
+        const total = await Todo.countDocuments(filter);
+
+        res.json({
+            todos,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error('[Todo] Error in getTodos:', error);
+        res.status(500).json({ message: error.message || 'Failed to fetch todos' });
+    }
 });
 
 // Get todo by ID
 export const getTodoById = asyncHandler(async (req, res) => {
-    const user = await getUserFromAuth(req.auth.userId);
+    const user = await getUserFromAuth(req.auth.userId, req.mobileUser);
     const todo = await Todo.findOne({ _id: req.params.id, createdBy: user._id });
-    
+
     if (!todo) {
         return res.status(404).json({ message: 'Todo not found' });
     }
@@ -64,33 +86,38 @@ export const getTodoById = asyncHandler(async (req, res) => {
 
 // Create new todo
 export const createTodo = asyncHandler(async (req, res) => {
-    const { title, description, priority, category } = req.body;
-    const user = await getUserFromAuth(req.auth.userId);
+    try {
 
-    const todo = await Todo.create({
-        title,
-        description,
-        priority: priority || 'medium',
-        category: category || 'general',
-        createdBy: user._id
-    });
+        const { title, description, priority, category } = req.body;
+        const user = await getUserFromAuth(req.auth.userId, req.mobileUser);
 
-    res.status(201).json(todo);
+        const todo = await Todo.create({
+            title,
+            description,
+            priority: priority || 'medium',
+            category: category || 'general',
+            createdBy: user._id
+        });
+        res.status(201).json(todo);
+    } catch (error) {
+        console.error('[Todo] Error in createTodo:', error);
+        res.status(500).json({ message: error.message || 'Failed to create todo' });
+    }
 });
 
 // Update todo
 export const updateTodo = asyncHandler(async (req, res) => {
     const { title, description, completed, priority, category } = req.body;
-    const user = await getUserFromAuth(req.auth.userId);
+    const user = await getUserFromAuth(req.auth.userId, req.mobileUser);
 
     const todo = await Todo.findOneAndUpdate(
         { _id: req.params.id, createdBy: user._id },
-        { 
-            title, 
-            description, 
-            completed, 
-            priority, 
-            category 
+        {
+            title,
+            description,
+            completed,
+            priority,
+            category
         },
         { new: true, runValidators: true }
     );
@@ -104,7 +131,7 @@ export const updateTodo = asyncHandler(async (req, res) => {
 
 // Delete todo
 export const deleteTodo = asyncHandler(async (req, res) => {
-    const user = await getUserFromAuth(req.auth.userId);
+    const user = await getUserFromAuth(req.auth.userId, req.mobileUser);
     const todo = await Todo.findOneAndDelete({ _id: req.params.id, createdBy: user._id });
 
     if (!todo) {
@@ -116,7 +143,7 @@ export const deleteTodo = asyncHandler(async (req, res) => {
 
 // Toggle todo completion
 export const toggleTodoComplete = asyncHandler(async (req, res) => {
-    const user = await getUserFromAuth(req.auth.userId);
+    const user = await getUserFromAuth(req.auth.userId, req.mobileUser);
     const todo = await Todo.findOne({ _id: req.params.id, createdBy: user._id });
 
     if (!todo) {
@@ -129,45 +156,47 @@ export const toggleTodoComplete = asyncHandler(async (req, res) => {
     res.json(todo);
 });
 
-// Get todo statistics
+// Get todo statistics (all todos from all users)
 export const getTodoStats = asyncHandler(async (req, res) => {
-    const user = await getUserFromAuth(req.auth.userId);
-    const userId = user._id;
+    try {
 
-    const stats = await Todo.aggregate([
-        { $match: { createdBy: userId } },
-        {
-            $group: {
-                _id: null,
-                total: { $sum: 1 },
-                completed: { $sum: { $cond: ['$completed', 1, 0] } },
-                pending: { $sum: { $cond: ['$completed', 0, 1] } },
-                highPriority: { $sum: { $cond: [{ $eq: ['$priority', 'high'] }, 1, 0] } }
+        const stats = await Todo.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    completed: { $sum: { $cond: ['$completed', 1, 0] } },
+                    pending: { $sum: { $cond: ['$completed', 0, 1] } },
+                    highPriority: { $sum: { $cond: [{ $eq: ['$priority', 'high'] }, 1, 0] } }
+                }
             }
-        }
-    ]);
+        ]);
 
-    const categoryStats = await Todo.aggregate([
-        { $match: { createdBy: userId } },
-        {
-            $group: {
-                _id: '$category',
-                count: { $sum: 1 },
-                completed: { $sum: { $cond: ['$completed', 1, 0] } }
+        const categoryStats = await Todo.aggregate([
+            {
+                $group: {
+                    _id: '$category',
+                    count: { $sum: 1 },
+                    completed: { $sum: { $cond: ['$completed', 1, 0] } }
+                }
             }
-        }
-    ]);
+        ]);
 
-    const result = stats[0] || {
-        total: 0,
-        completed: 0,
-        pending: 0,
-        highPriority: 0
-    };
+        const result = stats[0] || {
+            total: 0,
+            completed: 0,
+            pending: 0,
+            highPriority: 0
+        };
 
-    res.json({
-        ...result,
-        completionRate: result.total > 0 ? Math.round((result.completed / result.total) * 100) : 0,
-        categoryStats
-    });
+
+        res.json({
+            ...result,
+            completionRate: result.total > 0 ? Math.round((result.completed / result.total) * 100) : 0,
+            categoryStats
+        });
+    } catch (error) {
+        console.error('[Todo] Error in getTodoStats:', error);
+        res.status(500).json({ message: error.message || 'Failed to fetch stats' });
+    }
 });
