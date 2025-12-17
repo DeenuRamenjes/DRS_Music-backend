@@ -46,6 +46,54 @@ export const getMessages = async (req, res, next) => {
   }
 }
 
+// Send a message (REST API alternative to socket)
+export const sendMessage = async (req, res, next) => {
+  try {
+    // Get sender ID (works for both Clerk and mobile users)
+    let senderId = req.auth.userId;
+    if (req.mobileUser) {
+      senderId = req.mobileUser.clerkId;
+    }
+
+    const { receiverId, content, messageType, songData } = req.body;
+
+    if (!receiverId || !content) {
+      return res.status(400).json({ message: 'Receiver ID and content are required' });
+    }
+
+    // Build message data
+    const messageData = {
+      senderId,
+      receiverId,
+      content
+    };
+
+    // Add song data if it's a song message
+    if (messageType === 'song' && songData) {
+      messageData.messageType = 'song';
+      messageData.songData = {
+        songId: songData.songId,
+        title: songData.title,
+        artist: songData.artist,
+        imageUrl: songData.imageUrl,
+        audioUrl: songData.audioUrl,
+        duration: songData.duration
+      };
+    }
+
+    const message = await Message.create(messageData);
+
+    res.status(201).json({
+      success: true,
+      message: 'Message sent successfully',
+      data: message
+    });
+  } catch (error) {
+    console.error("Error in sendMessage", error);
+    next(error);
+  }
+}
+
 // Helper function to find user - supports both Clerk ID and MongoDB _id
 const findUserByIdOrClerkId = async (id, populate = null) => {
   // Try by clerkId first

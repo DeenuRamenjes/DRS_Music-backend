@@ -134,6 +134,73 @@ export const mobileAuth = async (req, res) => {
     }
 };
 
+// Email Login - For existing users, allows Google users to set password on first email login
+export const emailLogin = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and password are required"
+            });
+        }
+
+        // Find user by email
+        const user = await User.findOne({ email: email.toLowerCase() });
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "No account found with this email"
+            });
+        }
+
+        const bcrypt = await import('bcryptjs');
+
+        // Check if user has a password set
+        if (!user.password) {
+            // User exists (likely from Google sign-in) but has no password
+            // Set the provided password as their new password
+            const hashedPassword = await bcrypt.hash(password, 10);
+            user.password = hashedPassword;
+            await user.save();
+            
+            console.log(`Password set for existing user: ${user.email}`);
+        } else {
+            // User has password, verify it
+            const isPasswordValid = await bcrypt.compare(password, user.password);
+
+            if (!isPasswordValid) {
+                return res.status(401).json({
+                    success: false,
+                    message: "Invalid password"
+                });
+            }
+        }
+
+        // Check if user is admin
+        const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+        const isAdmin = adminEmails.includes(user.email);
+
+        res.status(200).json({
+            success: true,
+            user: {
+                id: user._id,
+                clerkId: user.clerkId,
+                email: user.email,
+                name: user.name,
+                imageUrl: user.image,
+                isAdmin
+            },
+            token: 'mobile_session_' + user._id
+        });
+    } catch (error) {
+        console.error("Error in email login:", error);
+        res.status(500).json({ success: false, message: "Error in email login" });
+    }
+};
+
 // Get current user - for session verification
 export const getMe = async (req, res) => {
     try {

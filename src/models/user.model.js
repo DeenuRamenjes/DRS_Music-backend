@@ -13,6 +13,10 @@ const userSchema = new mongoose.Schema({
         unique: true,     // Prevent duplicate emails
         index: true
     },
+    password: {
+        type: String,
+        required: false,  // Optional - Google users won't have password
+    },
     image: {
         type: String,
         required: false,
