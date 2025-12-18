@@ -44,7 +44,20 @@ const userSchema = new mongoose.Schema({
             audioQuality: { type: String, enum: ['low', 'normal', 'high'], default: 'high' },
             crossfade: { type: Boolean, default: false },
             gaplessPlayback: { type: Boolean, default: true },
-            normalizeVolume: { type: Boolean, default: false }
+            normalizeVolume: { type: Boolean, default: false },
+            equalizerEnabled: { type: Boolean, default: false },
+            equalizerPreset: {
+                type: String,
+                enum: ['flat', 'bass', 'treble', 'vocal', 'rock', 'pop', 'jazz', 'classical', 'custom'],
+                default: 'flat'
+            },
+            customBands: {
+                band60Hz: { type: Number, default: 0, min: -12, max: 12 },
+                band230Hz: { type: Number, default: 0, min: -12, max: 12 },
+                band910Hz: { type: Number, default: 0, min: -12, max: 12 },
+                band3600Hz: { type: Number, default: 0, min: -12, max: 12 },
+                band14000Hz: { type: Number, default: 0, min: -12, max: 12 }
+            }
         },
         display: {
             theme: { type: String, enum: ['dark', 'light', 'system'], default: 'dark' },
