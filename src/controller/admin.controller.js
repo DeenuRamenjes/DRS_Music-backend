@@ -1048,3 +1048,97 @@ export const deleteUserAdmin = async (req, res, next) => {
         next(error);
     }
 };
+
+// ==================== ADMIN MANAGEMENT ====================
+
+// Get all admin users
+export const getAllAdmins = async (req, res, next) => {
+    try {
+        const admins = await User.find({ isAdmin: true })
+            .select('_id name email image isAdmin createdAt')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(admins);
+    } catch (error) {
+        console.error("Error fetching admins", error);
+        next(error);
+    }
+};
+
+// Promote a user to admin
+export const promoteToAdmin = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (user.isAdmin) {
+            return res.status(400).json({ message: "User is already an admin" });
+        }
+
+        user.isAdmin = true;
+        await user.save();
+
+        res.status(200).json({
+            message: "User promoted to admin successfully",
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                image: user.image,
+                isAdmin: user.isAdmin
+            }
+        });
+    } catch (error) {
+        console.error("Error promoting user to admin", error);
+        next(error);
+    }
+};
+
+// Demote a user from admin
+export const demoteFromAdmin = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const currentUserId = req.mobileUser?._id?.toString() || req.auth?.userId;
+
+        // Prevent demoting yourself
+        if (userId === currentUserId) {
+            return res.status(400).json({ message: "You cannot demote yourself" });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (!user.isAdmin) {
+            return res.status(400).json({ message: "User is not an admin" });
+        }
+
+        // Check if this is the last admin
+        const adminCount = await User.countDocuments({ isAdmin: true });
+        if (adminCount <= 1) {
+            return res.status(400).json({ message: "Cannot remove the last admin" });
+        }
+
+        user.isAdmin = false;
+        await user.save();
+
+        res.status(200).json({
+            message: "User demoted from admin successfully",
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                image: user.image,
+                isAdmin: user.isAdmin
+            }
+        });
+    } catch (error) {
+        console.error("Error demoting user from admin", error);
+        next(error);
+    }
+};

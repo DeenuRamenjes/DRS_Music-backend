@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema({
     lastSeen: {
         type: Date
     },
+    isAdmin: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
     settings: {
         playback: {
             shuffle: { type: Boolean, default: false },

@@ -3,7 +3,8 @@ import {
     createSong, createAlbum, deleteSong, deleteAlbum, checkAdmin,
     assignSongsToAlbum, updateSong, updateAlbum, sendBroadcastNotification,
     processAudioForLyrics, getAllUsersAdmin, getUserByIdAdmin,
-    updateUserAdmin, deleteUserAdmin
+    updateUserAdmin, deleteUserAdmin,
+    getAllAdmins, promoteToAdmin, demoteFromAdmin
 } from "../controller/admin.controller.js";
 
 import { protectRoute, requireAdmin } from "../middleware/auth.middleware.js";
@@ -30,6 +31,11 @@ router.get("/users", getAllUsersAdmin);
 router.get("/users/:id", getUserByIdAdmin);
 router.put("/users/:id", updateUserAdmin);
 router.delete("/users/:id", deleteUserAdmin);
+
+// Admin management routes
+router.get("/admins", getAllAdmins);
+router.post("/admins/:userId", promoteToAdmin);
+router.delete("/admins/:userId", demoteFromAdmin);
 
 // Notification and audio processing
 router.post("/notifications", sendBroadcastNotification);

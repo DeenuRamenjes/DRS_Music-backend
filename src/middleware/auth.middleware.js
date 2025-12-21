@@ -39,24 +39,27 @@ export const protectRoute = async (req, res, next) => {
 
 export const requireAdmin = async (req, res, next) => {
     try {
-        // Check for mobile user first
+        let userEmail = null;
+        let dbUser = null;
+
         if (req.mobileUser) {
-            const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
-            const isAdmin = adminEmails.includes(req.mobileUser.email);
-            if (!isAdmin) {
-                return res.status(403).json({ message: "Forbidden-You don't have access" });
-            }
+            dbUser = req.mobileUser;
+            userEmail = req.mobileUser.email;
+        } else if (req.auth?.userId) {
+            const currentUser = await clerkClient.users.getUser(req.auth.userId);
+            userEmail = currentUser.primaryEmailAddress?.emailAddress;
+            dbUser = await User.findOne({ clerkId: req.auth.userId });
+        }
+
+        if (!dbUser) {
+            return res.status(403).json({ message: "Forbidden-User not found" });
+        }
+
+        if (dbUser.isAdmin) {
             return next();
         }
 
-        // Clerk auth
-        const currentUser = await clerkClient.users.getUser(req.auth.userId);
-        const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
-        const isAdmin = adminEmails.includes(currentUser.primaryEmailAddress?.emailAddress);
-        if (!isAdmin) {
-            return res.status(403).json({ message: "Forbidden-You don't have access" });
-        }
-        next();
+        return res.status(403).json({ message: "Forbidden-You don't have access" });
     } catch (error) {
         console.error("Error in checking admin", error);
         res.status(500).json({ message: "Internal server error" });
