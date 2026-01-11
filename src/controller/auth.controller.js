@@ -1,5 +1,8 @@
 import { User } from "../models/user.model.js";
 import dotenv from "dotenv";
+import { sendEmail } from "../lib/email.js";
+import { getWelcomeEmailTemplate, getWelcomeEmailText } from "../templates/welcomeEmail.js";
+
 dotenv.config();
 
 // Mobile auth - handles Google Sign-In users and demo/email users
@@ -12,6 +15,7 @@ export const mobileAuth = async (req, res) => {
         }
 
         let user = null;
+        let isNewUser = false;
 
         // PRIORITY ORDER FOR FINDING EXISTING USERS:
         // 1. By googleId (if provided) - most specific
@@ -56,6 +60,7 @@ export const mobileAuth = async (req, res) => {
                     name: newName,
                     image: imageUrl || ''
                 });
+                isNewUser = true;
             }
         } else {
             // Update existing user info if provided
@@ -81,6 +86,23 @@ export const mobileAuth = async (req, res) => {
         const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
         const isAdmin = adminEmails.includes(user.email);
 
+        // Send welcome/login email (non-blocking)
+        if (user.email) {
+            const emailData = {
+                userName: user.name || 'Music Lover',
+                userImage: user.image || imageUrl,
+                isNewUser
+            };
+
+            // Fire and forget - don't wait for email to send
+            sendEmail({
+                to: user.email,
+                subject: isNewUser ? '🎵 Welcome to DRS Music!' : '🎶 Welcome back to DRS Music!',
+                html: getWelcomeEmailTemplate(emailData),
+                text: getWelcomeEmailText(emailData)
+            }).catch(err => console.error('Failed to send welcome email:', err.message));
+        }
+
         res.status(200).json({
             success: true,
             user: {
@@ -105,6 +127,7 @@ export const mobileAuth = async (req, res) => {
         });
     }
 };
+
 
 // Email Login - For existing users, allows Google users to set password on first email login
 export const emailLogin = async (req, res) => {
