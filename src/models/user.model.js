@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        required: false,  // Optional for Clerk users without email
+        required: false,  // Optional for users without email
         sparse: true,     // Allows multiple nulls/empty strings
         unique: true,     // Prevent duplicate emails
         index: true
@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema({
         required: false,
         default: ''
     },
-    clerkId: {
+    googleId: {
         type: String,
         required: true,
         unique: true

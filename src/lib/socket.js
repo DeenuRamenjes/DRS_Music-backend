@@ -6,7 +6,7 @@ let ioInstance;
 
 const updateAndEmitLastSeen = async (userId, createIfMissing = false) => {
     try {
-        let query = { clerkId: userId };
+        let query = { googleId: userId };
         if (!createIfMissing) {
             query.lastSeen = { $exists: true };
         }
@@ -15,14 +15,14 @@ const updateAndEmitLastSeen = async (userId, createIfMissing = false) => {
 
         if (existingUser || createIfMissing) {
             await User.findOneAndUpdate(
-                { clerkId: userId },
+                { googleId: userId },
                 { $set: { lastSeen: new Date() } },
-                { new: true, select: 'clerkId lastSeen', upsert: createIfMissing }
+                { new: true, select: 'googleId lastSeen', upsert: createIfMissing }
             );
 
-            const updatedUser = await User.findOne({ clerkId: userId }, 'clerkId lastSeen');
+            const updatedUser = await User.findOne({ googleId: userId }, 'googleId lastSeen');
             if (updatedUser && updatedUser.lastSeen) {
-                ioInstance.emit("last_seen_updated", [[updatedUser.clerkId, updatedUser.lastSeen.getTime()]]);
+                ioInstance.emit("last_seen_updated", [[updatedUser.googleId, updatedUser.lastSeen.getTime()]]);
             }
         }
     } catch (error) {
@@ -70,10 +70,10 @@ export const initializeSocket = (server) => {
             ioInstance.emit("activities", Array.from(userActivities.entries()));
 
             try {
-                const users = await User.find({}, 'clerkId lastSeen');
+                const users = await User.find({}, 'googleId lastSeen');
                 const lastSeenData = users
                     .filter(user => user.lastSeen && !isNaN(user.lastSeen.getTime()))
-                    .map(user => [user.clerkId, user.lastSeen.getTime()]);
+                    .map(user => [user.googleId, user.lastSeen.getTime()]);
                 socket.emit("last_seen_updated", lastSeenData);
             } catch (error) {
                 console.error("Error fetching lastSeen data:", error);

@@ -1,60 +1,79 @@
 import { Song } from "../models/song.model.js";
 
 
-export const getAllSong = async(req, res, next) => {
-    try{
-        const songs =await Song.find().sort({createdAt:-1})
+export const getAllSong = async (req, res, next) => {
+    try {
+        const page = parseInt(req.query.page);
+        const limit = parseInt(req.query.limit);
+
+        if (!isNaN(page) && !isNaN(limit)) {
+            const skip = (page - 1) * limit;
+            const [songs, total] = await Promise.all([
+                Song.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+                Song.countDocuments()
+            ]);
+
+            return res.json({
+                songs,
+                total,
+                page,
+                limit,
+                hasMore: skip + songs.length < total
+            });
+        }
+
+        const songs = await Song.find().sort({ createdAt: -1 })
         res.json(songs)
     }
-    catch(err){
+    catch (err) {
         console.error("Error in getAllSong", err.message);
         next(err);
     }
 }
 
-export const getFeaturedSong = async(req, res, next) => {
-    try{
-        const songs =await Song.aggregate([
-            { 
-                $sample: { size: 6 } 
+export const getFeaturedSong = async (req, res, next) => {
+    try {
+        const songs = await Song.aggregate([
+            {
+                $sample: { size: 6 }
             }, // Randomly select 6 songs
-            { 
-                $project: { 
+            {
+                $project: {
                     _id: 1,
-                    title: 1, 
-                    artist: 1, 
+                    title: 1,
+                    artist: 1,
                     imageUrl: 1,
                     audioUrl: 1
                 }
-            } 
+            }
         ])
         res.json(songs)
     }
-    catch(err){
+    catch (err) {
         console.error("Error in getFeaturedSong", err.message);
         next(err);
     }
 }
 
-export const getMadeForYouSong = async(req, res, next) => {
-    try{
-        const songs =await Song.aggregate([
-            { 
-                $sample: { size: 4 } 
+export const getMadeForYouSong = async (req, res, next) => {
+    try {
+        const songs = await Song.aggregate([
+            {
+                $sample: { size: 4 }
             }, // Randomly select 4 songs
-            { 
-                $project: { 
+            {
+                $project: {
                     _id: 1,
-                    title: 1, 
-                    artist: 1, 
+                    title: 1,
+                    artist: 1,
                     imageUrl: 1,
                     audioUrl: 1
                 }
-            } 
+            }
         ])
         res.json(songs)
     }
-    catch(err){
+    catch (err) {
         console.error("Error in getFeaturedSong", err.message);
         next(err);
     }
@@ -92,8 +111,8 @@ export const searchSongs = async (req, res, next) => {
                 { artist: { $regex: query, $options: "i" } }
             ]
         })
-        .sort({ createdAt: -1 })
-        .limit(25);
+            .sort({ createdAt: -1 })
+            .limit(25);
 
         res.json(songs);
     }
@@ -103,25 +122,25 @@ export const searchSongs = async (req, res, next) => {
     }
 }
 
-export const getTreandingSong = async(req, res, next) => {
-    try{
-        const songs =await Song.aggregate([
-            { 
-                $sample: { size: 4 } 
+export const getTreandingSong = async (req, res, next) => {
+    try {
+        const songs = await Song.aggregate([
+            {
+                $sample: { size: 4 }
             }, // Randomly select 4 songs
-            { 
-                $project: { 
+            {
+                $project: {
                     _id: 1,
-                    title: 1, 
-                    artist: 1, 
+                    title: 1,
+                    artist: 1,
                     imageUrl: 1,
                     audioUrl: 1
                 }
-            } 
+            }
         ])
         res.json(songs)
     }
-    catch(err){
+    catch (err) {
         console.error("Error in getFeaturedSong", err.message);
         next(err);
     }

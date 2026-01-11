@@ -5,7 +5,7 @@ import { protectRoute } from '../middleware/auth.middleware.js';
 import mongoose from 'mongoose';
 
 // Helper function to get user from database
-// Handles both mobile users (userId is MongoDB ObjectId) and Clerk users (userId is clerkId)
+// Handles both mobile users (userId is MongoDB ObjectId) and Google users (userId is googleId)
 const getUserFromAuth = async (userId, mobileUser) => {
     // If mobileUser is available, use it directly
     if (mobileUser) {
@@ -19,8 +19,8 @@ const getUserFromAuth = async (userId, mobileUser) => {
         if (user) return user;
     }
 
-    // Fall back to finding by clerkId (for Clerk users)
-    const user = await User.findOne({ clerkId: userId });
+    // Fall back to finding by googleId (for Google users)
+    const user = await User.findOne({ googleId: userId });
     if (!user) {
         throw new Error('User not found in database');
     }

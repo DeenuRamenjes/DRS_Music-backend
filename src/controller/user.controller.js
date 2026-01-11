@@ -6,7 +6,7 @@ import { Song } from '../models/song.model.js'
 export const getAllUsers = async (req, res, next) => {
   try {
     const currentUserId = req.auth.userId
-    const users = await User.find({ clerkId: { $ne: currentUserId } })
+    const users = await User.find({ googleId: { $ne: currentUserId } })
     res.status(200).json(users)
   }
   catch (err) {
@@ -17,12 +17,12 @@ export const getAllUsers = async (req, res, next) => {
 
 export const getMessages = async (req, res, next) => {
   try {
-    // For mobile users, we need to use clerkId
+    // For mobile users, we need to use googleId
     let myId = req.auth.userId;
 
-    // If this is a mobile user, get their clerkId
+    // If this is a mobile user, get their googleId
     if (req.mobileUser) {
-      myId = req.mobileUser.clerkId;
+      myId = req.mobileUser.googleId;
     }
 
     const { userId } = req.params;
@@ -52,7 +52,7 @@ export const sendMessage = async (req, res, next) => {
     // Get sender ID (works for both Clerk and mobile users)
     let senderId = req.auth.userId;
     if (req.mobileUser) {
-      senderId = req.mobileUser.clerkId;
+      senderId = req.mobileUser.googleId;
     }
 
     const { receiverId, content, messageType, songData } = req.body;
@@ -94,10 +94,10 @@ export const sendMessage = async (req, res, next) => {
   }
 }
 
-// Helper function to find user - supports both Clerk ID and MongoDB _id
-const findUserByIdOrClerkId = async (id, populate = null) => {
-  // Try by clerkId first
-  let user = await User.findOne({ clerkId: id });
+// Helper function to find user - supports both Google ID and MongoDB _id
+const findUserByIdOrGoogleId = async (id, populate = null) => {
+  // Try by googleId first
+  let user = await User.findOne({ googleId: id });
 
   // If not found, try by MongoDB _id (for mobile users)
   if (!user) {
@@ -117,7 +117,7 @@ const findUserByIdOrClerkId = async (id, populate = null) => {
 export const getLikedSongs = async (req, res, next) => {
   try {
     const userId = req.auth.userId;
-    const user = await findUserByIdOrClerkId(userId, 'likedSongs');
+    const user = await findUserByIdOrGoogleId(userId, 'likedSongs');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -132,7 +132,7 @@ export const likeSong = async (req, res, next) => {
   try {
     const userId = req.auth.userId;
     const { songId } = req.params;
-    const user = await findUserByIdOrClerkId(userId);
+    const user = await findUserByIdOrGoogleId(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -160,7 +160,7 @@ export const unlikeSong = async (req, res, next) => {
   try {
     const userId = req.auth.userId;
     const { songId } = req.params;
-    const user = await findUserByIdOrClerkId(userId);
+    const user = await findUserByIdOrGoogleId(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -178,8 +178,8 @@ export const unlikeSong = async (req, res, next) => {
 
 export const deleteUser = async (req, res, next) => {
   try {
-    const clerkId = req.auth.userId;
-    const user = await User.findOne({ clerkId });
+    const googleId = req.auth.userId;
+    const user = await User.findOne({ googleId });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -197,10 +197,10 @@ export const deleteUser = async (req, res, next) => {
 
 export const getLastSeenData = async (req, res, next) => {
   try {
-    const users = await User.find({}, 'clerkId lastSeen');
+    const users = await User.find({}, 'googleId lastSeen');
     const lastSeenData = users
       .filter(user => user.lastSeen && !isNaN(user.lastSeen.getTime()))
-      .map(user => [user.clerkId, user.lastSeen.getTime()]);
+      .map(user => [user.googleId, user.lastSeen.getTime()]);
 
     res.status(200).json(lastSeenData);
   } catch (error) {
@@ -213,7 +213,7 @@ export const getLastSeenData = async (req, res, next) => {
 export const getSettings = async (req, res, next) => {
   try {
     const userId = req.auth.userId;
-    const user = await findUserByIdOrClerkId(userId);
+    const user = await findUserByIdOrGoogleId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -271,7 +271,7 @@ export const updateSettings = async (req, res, next) => {
       return res.status(400).json({ message: 'Settings data is required' });
     }
 
-    const user = await findUserByIdOrClerkId(userId);
+    const user = await findUserByIdOrGoogleId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -317,7 +317,7 @@ export const updatePlaybackSettings = async (req, res, next) => {
     const userId = req.auth.userId;
     const { shuffle, loop, volume } = req.body;
 
-    const user = await findUserByIdOrClerkId(userId);
+    const user = await findUserByIdOrGoogleId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

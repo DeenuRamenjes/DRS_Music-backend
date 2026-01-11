@@ -48,7 +48,7 @@ export const requireAdmin = async (req, res, next) => {
         } else if (req.auth?.userId) {
             const currentUser = await clerkClient.users.getUser(req.auth.userId);
             userEmail = currentUser.primaryEmailAddress?.emailAddress;
-            dbUser = await User.findOne({ clerkId: req.auth.userId });
+            dbUser = await User.findOne({ googleId: req.auth.userId });
         }
 
         if (!dbUser) {
