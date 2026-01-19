@@ -124,10 +124,10 @@ export const createSong = async (req, res, next) => {
 
         // Handle image - either upload provided image or generate placeholder
         if (imageFile) {
-            const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+            const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
             if (!allowedImageTypes.includes(imageFile.mimetype)) {
                 return res.status(400).json({
-                    message: "Invalid image file type. Please upload JPEG, JPG, or PNG images."
+                    message: "Invalid image file type. Please upload JPEG, JPG, PNG, or WebP images."
                 });
             }
             if (imageFile.size > maxImageSize) {
@@ -283,7 +283,7 @@ export const updateSong = async (req, res, next) => {
             return res.status(404).json({ message: "Song not found" });
         }
 
-        const { title, artist, duration } = req.body;
+        const { title, artist, duration, generatePlaceholder } = req.body;
         const extractedAlbumIds = extractAlbumIds(req.body);
 
         if (req.files?.audioFile) {
@@ -292,6 +292,81 @@ export const updateSong = async (req, res, next) => {
 
         if (req.files?.imageFile) {
             song.imageUrl = await uploadToCloudinary(req.files.imageFile);
+        } else if (generatePlaceholder === 'true') {
+            // Generate new placeholder image using canvas
+            try {
+                const { createCanvas } = await import('canvas');
+                const canvas = createCanvas(640, 640);
+                const ctx = canvas.getContext('2d');
+
+                // Use provided title/artist or existing song data
+                const placeholderTitle = title || song.title;
+                const placeholderArtist = artist || song.artist;
+
+                // Generate random colors
+                const baseHue = Math.floor(Math.random() * 360);
+                const gradient = ctx.createLinearGradient(0, 0, 640, 640);
+                gradient.addColorStop(0, `hsl(${baseHue}, 70%, 20%)`);
+                gradient.addColorStop(1, `hsl(${(baseHue + 45) % 360}, 70%, 45%)`);
+
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 640, 640);
+
+                // Add decorative circles
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+                for (let i = 0; i < 6; i++) {
+                    ctx.beginPath();
+                    ctx.arc(
+                        Math.random() * 640,
+                        Math.random() * 640,
+                        80 + Math.random() * 120,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+
+                // Add title text
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 44px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const displayTitle = placeholderTitle.length > 25 ? placeholderTitle.slice(0, 25) + '...' : placeholderTitle;
+                ctx.fillText(displayTitle, 320, 300);
+
+                // Add artist text
+                const artistHue = (baseHue + 20) % 360;
+                ctx.fillStyle = `hsl(${artistHue}, 60%, 80%)`;
+                ctx.font = '24px sans-serif';
+                const displayArtist = placeholderArtist.length > 35 ? placeholderArtist.slice(0, 35) + '...' : placeholderArtist;
+                ctx.fillText(displayArtist, 320, 360);
+
+                // Convert canvas to buffer and save to temp file
+                const buffer = canvas.toBuffer('image/png');
+                const tempDir = path.join(process.cwd(), 'tmp');
+                const tempPath = path.join(tempDir, `placeholder_${Date.now()}.png`);
+
+                // Ensure tmp directory exists
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
+
+                fs.writeFileSync(tempPath, buffer);
+
+                // Upload the placeholder image to Cloudinary
+                const placeholderFile = {
+                    tempFilePath: tempPath,
+                    mimetype: 'image/png',
+                    size: buffer.length
+                };
+                song.imageUrl = await uploadToCloudinary(placeholderFile);
+
+                // Clean up temp file
+                try { fs.unlinkSync(tempPath); } catch (e) { /* ignore */ }
+            } catch (canvasError) {
+                console.error('Canvas error generating placeholder for update:', canvasError);
+                // Don't fail the update, just log the error
+            }
         }
 
         if (title) song.title = title;
@@ -343,6 +418,7 @@ export const updateSong = async (req, res, next) => {
 
 export const createAlbum = async (req, res, next) => {
     try {
+        
         if (!req.files || !req.files.imageFile) {
             return res.status(400).json({ message: "Please upload an image" });
         }
@@ -355,10 +431,10 @@ export const createAlbum = async (req, res, next) => {
         const imageFile = req.files.imageFile;
 
         // Validate file type
-        const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
         if (!allowedImageTypes.includes(imageFile.mimetype)) {
             return res.status(400).json({
-                message: "Invalid image file type. Please upload JPEG, JPG, or PNG images."
+                message: "Invalid image file type. Please upload JPEG, JPG, PNG, or WebP images."
             });
         }
 

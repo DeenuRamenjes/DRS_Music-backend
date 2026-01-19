@@ -65,17 +65,14 @@ app.use(cors(
     }
 ));
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(clerkMiddleware())
-
 // Create temp directory if it doesn't exist
 const tempDir = path.join(__dirname, 'temp');
 if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
 }
 
-// Configure file upload middleware
+// Configure file upload middleware BEFORE body parsers
+// This ensures multipart/form-data is handled correctly for file uploads
 app.use(fileUpload({
     useTempFiles: true,
     tempFileDir: tempDir,
@@ -87,12 +84,26 @@ app.use(fileUpload({
     abortOnLimit: false, // Don't abort on limit, return error instead
     safeFileNames: true,
     preserveExtension: true,
-    debug: process.env.NODE_ENV === 'development',
+    debug: true, // Enable debug logging for file uploads
     parseNested: true // Enable nested form data parsing
 }));
 
+// Body parsers AFTER file upload middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(clerkMiddleware())
+
+
 // Error handler for file upload limits
 app.use((err, req, res, next) => {
+    
+    // Handle payload too large (413) errors
+    if (err.type === 'entity.too.large' || err.status === 413 || err.statusCode === 413) {
+        return res.status(413).json({
+            message: 'Request payload is too large. Maximum size is 50MB for files.'
+        });
+    }
+    
     if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
             message: 'File size is too large. Maximum size is 50MB.'
