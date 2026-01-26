@@ -161,7 +161,6 @@ export const emailLogin = async (req, res) => {
             user.password = hashedPassword;
             await user.save();
 
-            console.log(`Password set for existing user: ${user.email}`);
         } else {
             // User has password, verify it
             const isPasswordValid = await bcrypt.compare(password, user.password);

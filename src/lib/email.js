@@ -28,7 +28,6 @@ export const sendEmail = async ({ to, subject, html, text }) => {
     try {
         // Skip if SMTP not configured
         if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-            console.log('SMTP not configured, skipping email send');
             return { success: false, reason: 'SMTP not configured' };
         }
 
@@ -43,10 +42,8 @@ export const sendEmail = async ({ to, subject, html, text }) => {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully:', info.messageId);
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('Error sending email:', error.message);
         return { success: false, error: error.message };
     }
 };

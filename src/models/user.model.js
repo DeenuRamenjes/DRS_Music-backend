@@ -36,6 +36,14 @@ const userSchema = new mongoose.Schema({
     lastSeen: {
         type: Date
     },
+    totalAppUseTime: {
+        type: Number,
+        default: 0
+    },
+    totalListeningTime: {
+        type: Number,
+        default: 0
+    },
     isAdmin: {
         type: Boolean,
         default: false,

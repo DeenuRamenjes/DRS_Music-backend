@@ -78,35 +78,35 @@ app.use(fileUpload({
     tempFileDir: tempDir,
     createParentPath: true,
     limits: {
-        fileSize: 50 * 1024 * 1024, // 50 MB
+        fileSize: 150 * 1024 * 1024, // 150 MB (To accommodate 100MB audio + 30MB image)
         files: 2 // Maximum number of files
     },
     abortOnLimit: false, // Don't abort on limit, return error instead
     safeFileNames: true,
     preserveExtension: true,
-    debug: true, // Enable debug logging for file uploads
+    debug: false, // Disable debug logging for file uploads
     parseNested: true // Enable nested form data parsing
 }));
 
 // Body parsers AFTER file upload middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '150mb' }));
+app.use(express.urlencoded({ extended: true, limit: '150mb' }));
 app.use(clerkMiddleware())
 
 
 // Error handler for file upload limits
 app.use((err, req, res, next) => {
-    
+
     // Handle payload too large (413) errors
     if (err.type === 'entity.too.large' || err.status === 413 || err.statusCode === 413) {
         return res.status(413).json({
-            message: 'Request payload is too large. Maximum size is 50MB for files.'
+            message: 'Request payload is too large. Maximum size is 150MB for total payload.'
         });
     }
-    
+
     if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
-            message: 'File size is too large. Maximum size is 50MB.'
+            message: 'File size is too large. Maximum limits: Audio (100MB), Image (30MB).'
         });
     }
     if (err.code === 'LIMIT_FILE_COUNT') {

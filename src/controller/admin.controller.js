@@ -89,7 +89,7 @@ export const createSong = async (req, res, next) => {
             return res.status(400).json({ message: "Please upload an audio file" });
         }
 
-        const { title, artist, duration, generatePlaceholder } = req.body;
+        const { title, artist, duration, generatePlaceholder, baseHue: bodyHue } = req.body;
         const albumIds = extractAlbumIds(req.body) ?? [];
         if (!title || !artist || !duration) {
             return res.status(400).json({ message: "Please provide all required fields" });
@@ -108,12 +108,12 @@ export const createSong = async (req, res, next) => {
         }
 
         // Validate file sizes
-        const maxAudioSize = 50 * 1024 * 1024; // 50MB
-        const maxImageSize = 10 * 1024 * 1024; // 10MB
+        const maxAudioSize = 100 * 1024 * 1024; // 100MB
+        const maxImageSize = 30 * 1024 * 1024; // 30MB
 
         if (audioFile.size > maxAudioSize) {
             return res.status(400).json({
-                message: "Audio file is too large. Maximum size is 50MB."
+                message: "Audio file is too large. Maximum size is 100MB."
             });
         }
 
@@ -122,7 +122,7 @@ export const createSong = async (req, res, next) => {
         // Upload audio file
         audioUrl = await uploadToCloudinary(audioFile);
 
-        // Handle image - either upload provided image or generate placeholder
+        // Handle image - upload provided image (always expected from mobile app now)
         if (imageFile) {
             const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
             if (!allowedImageTypes.includes(imageFile.mimetype)) {
@@ -132,85 +132,12 @@ export const createSong = async (req, res, next) => {
             }
             if (imageFile.size > maxImageSize) {
                 return res.status(400).json({
-                    message: "Image file is too large. Maximum size is 10MB."
+                    message: "Image file is too large. Maximum size is 30MB."
                 });
             }
             imageUrl = await uploadToCloudinary(imageFile);
-        } else if (generatePlaceholder === 'true') {
-            // Generate placeholder image using canvas (same as web app)
-            try {
-                const { createCanvas } = await import('canvas');
-                const canvas = createCanvas(640, 640);
-                const ctx = canvas.getContext('2d');
-
-                // Generate random colors (matching web app's createPlaceholderArtwork)
-                const baseHue = Math.floor(Math.random() * 360);
-                const gradient = ctx.createLinearGradient(0, 0, 640, 640);
-                gradient.addColorStop(0, `hsl(${baseHue}, 70%, 20%)`);
-                gradient.addColorStop(1, `hsl(${(baseHue + 45) % 360}, 70%, 45%)`);
-
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, 640, 640);
-
-                // Add decorative circles
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
-                for (let i = 0; i < 6; i++) {
-                    ctx.beginPath();
-                    ctx.arc(
-                        Math.random() * 640,
-                        Math.random() * 640,
-                        80 + Math.random() * 120,
-                        0,
-                        Math.PI * 2
-                    );
-                    ctx.fill();
-                }
-
-                // Add title text
-                ctx.fillStyle = '#f8fafc';
-                ctx.font = 'bold 44px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const displayTitle = title.length > 25 ? title.slice(0, 25) + '...' : title;
-                ctx.fillText(displayTitle, 320, 300);
-
-                // Add artist text
-                const artistHue = (baseHue + 20) % 360;
-                ctx.fillStyle = `hsl(${artistHue}, 60%, 80%)`;
-                ctx.font = '24px sans-serif';
-                const displayArtist = artist.length > 35 ? artist.slice(0, 35) + '...' : artist;
-                ctx.fillText(displayArtist, 320, 360);
-
-                // Convert canvas to buffer and save to temp file
-                const buffer = canvas.toBuffer('image/png');
-                const tempDir = path.join(process.cwd(), 'tmp');
-                const tempPath = path.join(tempDir, `placeholder_${Date.now()}.png`);
-
-                // Ensure tmp directory exists
-                if (!fs.existsSync(tempDir)) {
-                    fs.mkdirSync(tempDir, { recursive: true });
-                }
-
-                fs.writeFileSync(tempPath, buffer);
-
-                // Upload the placeholder image to Cloudinary
-                const placeholderFile = {
-                    tempFilePath: tempPath,
-                    mimetype: 'image/png',
-                    size: buffer.length
-                };
-                imageUrl = await uploadToCloudinary(placeholderFile);
-
-                // Clean up temp file
-                try { fs.unlinkSync(tempPath); } catch (e) { /* ignore */ }
-            } catch (canvasError) {
-                console.error('Canvas error:', canvasError);
-                return res.status(400).json({
-                    message: "Please upload a cover image (placeholder generation failed)"
-                });
-            }
         } else {
-            return res.status(400).json({ message: "Please upload a cover image" });
+            return res.status(400).json({ message: "Please provide a cover image or captured artwork" });
         }
 
         const song = new Song({
@@ -283,7 +210,7 @@ export const updateSong = async (req, res, next) => {
             return res.status(404).json({ message: "Song not found" });
         }
 
-        const { title, artist, duration, generatePlaceholder } = req.body;
+        const { title, artist, duration, generatePlaceholder, baseHue: bodyHue } = req.body;
         const extractedAlbumIds = extractAlbumIds(req.body);
 
         if (req.files?.audioFile) {
@@ -292,81 +219,6 @@ export const updateSong = async (req, res, next) => {
 
         if (req.files?.imageFile) {
             song.imageUrl = await uploadToCloudinary(req.files.imageFile);
-        } else if (generatePlaceholder === 'true') {
-            // Generate new placeholder image using canvas
-            try {
-                const { createCanvas } = await import('canvas');
-                const canvas = createCanvas(640, 640);
-                const ctx = canvas.getContext('2d');
-
-                // Use provided title/artist or existing song data
-                const placeholderTitle = title || song.title;
-                const placeholderArtist = artist || song.artist;
-
-                // Generate random colors
-                const baseHue = Math.floor(Math.random() * 360);
-                const gradient = ctx.createLinearGradient(0, 0, 640, 640);
-                gradient.addColorStop(0, `hsl(${baseHue}, 70%, 20%)`);
-                gradient.addColorStop(1, `hsl(${(baseHue + 45) % 360}, 70%, 45%)`);
-
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, 640, 640);
-
-                // Add decorative circles
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
-                for (let i = 0; i < 6; i++) {
-                    ctx.beginPath();
-                    ctx.arc(
-                        Math.random() * 640,
-                        Math.random() * 640,
-                        80 + Math.random() * 120,
-                        0,
-                        Math.PI * 2
-                    );
-                    ctx.fill();
-                }
-
-                // Add title text
-                ctx.fillStyle = '#f8fafc';
-                ctx.font = 'bold 44px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const displayTitle = placeholderTitle.length > 25 ? placeholderTitle.slice(0, 25) + '...' : placeholderTitle;
-                ctx.fillText(displayTitle, 320, 300);
-
-                // Add artist text
-                const artistHue = (baseHue + 20) % 360;
-                ctx.fillStyle = `hsl(${artistHue}, 60%, 80%)`;
-                ctx.font = '24px sans-serif';
-                const displayArtist = placeholderArtist.length > 35 ? placeholderArtist.slice(0, 35) + '...' : placeholderArtist;
-                ctx.fillText(displayArtist, 320, 360);
-
-                // Convert canvas to buffer and save to temp file
-                const buffer = canvas.toBuffer('image/png');
-                const tempDir = path.join(process.cwd(), 'tmp');
-                const tempPath = path.join(tempDir, `placeholder_${Date.now()}.png`);
-
-                // Ensure tmp directory exists
-                if (!fs.existsSync(tempDir)) {
-                    fs.mkdirSync(tempDir, { recursive: true });
-                }
-
-                fs.writeFileSync(tempPath, buffer);
-
-                // Upload the placeholder image to Cloudinary
-                const placeholderFile = {
-                    tempFilePath: tempPath,
-                    mimetype: 'image/png',
-                    size: buffer.length
-                };
-                song.imageUrl = await uploadToCloudinary(placeholderFile);
-
-                // Clean up temp file
-                try { fs.unlinkSync(tempPath); } catch (e) { /* ignore */ }
-            } catch (canvasError) {
-                console.error('Canvas error generating placeholder for update:', canvasError);
-                // Don't fail the update, just log the error
-            }
         }
 
         if (title) song.title = title;
@@ -418,7 +270,7 @@ export const updateSong = async (req, res, next) => {
 
 export const createAlbum = async (req, res, next) => {
     try {
-        
+
         if (!req.files || !req.files.imageFile) {
             return res.status(400).json({ message: "Please upload an image" });
         }
@@ -439,10 +291,10 @@ export const createAlbum = async (req, res, next) => {
         }
 
         // Validate file size
-        const maxImageSize = 10 * 1024 * 1024; // 10MB for Cloudinary free tier
+        const maxImageSize = 30 * 1024 * 1024; // 30MB
         if (imageFile.size > maxImageSize) {
             return res.status(400).json({
-                message: "Image file is too large. Maximum size is 10MB for Cloudinary free tier. Please compress the image before uploading."
+                message: "Image file is too large. Maximum size is 30MB. Please compress the image if it exceeds this limit."
             });
         }
 

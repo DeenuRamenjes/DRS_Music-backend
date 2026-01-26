@@ -353,3 +353,90 @@ export const updatePlaybackSettings = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getUserProfile = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const user = await findUserByIdOrGoogleId(userId, 'likedSongs');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Return public profile data
+    res.status(200).json({
+      _id: user._id,
+      googleId: user.googleId,
+      name: user.name || user.fullName,
+      fullName: user.fullName || user.name,
+      username: user.username,
+      image: user.image || user.imageUrl,
+      imageUrl: user.imageUrl || user.image,
+      createdAt: user.createdAt,
+      likedSongs: user.likedSongs || [],
+      isAdmin: user.isAdmin || false,
+      stats: {
+        likedCount: user.likedSongs?.length || 0,
+        totalAppUseTime: user.totalAppUseTime || 0,
+        totalListeningTime: user.totalListeningTime || 0,
+      }
+    });
+  } catch (error) {
+    console.error('Error in getUserProfile', error);
+    next(error);
+  }
+};
+
+export const syncAppUsageTime = async (req, res, next) => {
+  try {
+    const userId = req.auth.userId;
+    const { additionalTime } = req.body; // In seconds
+
+    if (typeof additionalTime !== 'number' || additionalTime < 0) {
+      return res.status(400).json({ message: 'Valid additionalTime is required' });
+    }
+
+    const user = await findUserByIdOrGoogleId(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.totalAppUseTime = (user.totalAppUseTime || 0) + additionalTime;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      totalAppUseTime: user.totalAppUseTime
+    });
+  } catch (error) {
+    console.error('Error in syncAppUsageTime', error);
+    next(error);
+  }
+};
+
+export const syncListeningTime = async (req, res, next) => {
+  try {
+    const userId = req.auth.userId;
+    const { additionalTime } = req.body; // In seconds
+
+    if (typeof additionalTime !== 'number' || additionalTime < 0) {
+      return res.status(400).json({ message: 'Valid additionalTime is required' });
+    }
+
+    const user = await findUserByIdOrGoogleId(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.totalListeningTime = (user.totalListeningTime || 0) + additionalTime;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      totalListeningTime: user.totalListeningTime
+    });
+  } catch (error) {
+    console.error('Error in syncListeningTime', error);
+    next(error);
+  }
+};

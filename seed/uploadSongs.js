@@ -257,9 +257,7 @@ const connectDB = async () => {
         if (!process.env.MONGODB_URI) {
             throw new Error('MONGODB_URI not found in .env file');
         }
-        console.log('⏳ Connecting to MongoDB...');
         const conn = await mongoose.connect(process.env.MONGODB_URI);
-        console.log(`✅ MongoDB Connected: ${conn.connection.host}\n`);
     } catch (error) {
         console.error('❌ Error connecting to MongoDB:', error.message);
         process.exit(1);
@@ -270,15 +268,12 @@ const connectDB = async () => {
  * Main seed function
  */
 const seedSongs = async () => {
-    console.log('\n🎵 DRS Music - Song Seed Script');
-    console.log('================================\n');
 
     // Validate Cloudinary credentials
     if (!process.env.CLOUDINARY_CLOUD_NAME ||
         !process.env.CLOUDINARY_API_KEY ||
         !process.env.CLOUDINARY_API_SECRET) {
         console.error('❌ Cloudinary credentials not found in .env file');
-        console.log('   Required: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET');
         process.exit(1);
     }
 
@@ -287,9 +282,7 @@ const seedSongs = async () => {
 
     // Check if upload folder exists
     if (!fs.existsSync(UPLOAD_FOLDER)) {
-        console.log(`📁 Creating upload folder at: ${UPLOAD_FOLDER}`);
         fs.mkdirSync(UPLOAD_FOLDER, { recursive: true });
-        console.log('⚠️  Upload folder created. Please add audio files and run again.');
         await mongoose.connection.close();
         process.exit(0);
     }
@@ -301,15 +294,9 @@ const seedSongs = async () => {
         .sort();
 
     if (files.length === 0) {
-        console.log('⚠️  No audio files found in upload folder.');
-        console.log(`   Supported formats: ${supportedFormats.join(', ')}`);
-        console.log(`   Upload folder: ${UPLOAD_FOLDER}`);
         await mongoose.connection.close();
         process.exit(0);
     }
-
-    console.log(`📂 Found ${files.length} audio file(s) to process\n`);
-    console.log('─'.repeat(60));
 
     let uploaded = 0;
     let skipped = 0;
@@ -318,8 +305,6 @@ const seedSongs = async () => {
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const filePath = path.join(UPLOAD_FOLDER, file);
-        console.log(`\n[${i + 1}/${files.length}] 🎵 ${file}`);
-
         try {
             // Extract metadata from audio file
             const metadata = await extractMetadata(filePath);
@@ -332,10 +317,6 @@ const seedSongs = async () => {
             const artist = metadata.artist || parsedFilename.artist;
             const duration = formatDuration(metadata.duration);
 
-            console.log(`    📝 Title: ${title}`);
-            console.log(`    👤 Artist: ${artist}`);
-            console.log(`    ⏱️  Duration: ${duration}`);
-
             // Check if song already exists (by title and artist, case-insensitive)
             const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const escapedArtist = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -346,33 +327,26 @@ const seedSongs = async () => {
             });
 
             if (existingSong) {
-                console.log(`    ⏭️  Already exists, skipping...`);
                 skipped++;
                 continue;
             }
 
             // Upload audio to Cloudinary
-            console.log('    📤 Uploading audio...');
             const audioUrl = await uploadToCloudinary(filePath, 'video', 'songs');
-            console.log('    ✅ Audio uploaded');
 
             // Generate or use embedded album art
             let imageUrl;
             if (metadata.picture && metadata.picture.data) {
-                console.log('    🖼️  Using embedded album art...');
                 try {
                     imageUrl = await uploadBufferToCloudinary(metadata.picture.data, 'covers');
                 } catch (e) {
-                    console.log('    ⚠️  Failed to upload embedded art, generating placeholder...');
                     const imageBuffer = generatePlaceholderImage(title, artist);
                     imageUrl = await uploadBufferToCloudinary(imageBuffer, 'covers');
                 }
             } else {
-                console.log('    🎨 Generating album art...');
                 const imageBuffer = generatePlaceholderImage(title, artist);
                 imageUrl = await uploadBufferToCloudinary(imageBuffer, 'covers');
             }
-            console.log('    ✅ Image uploaded');
 
             // Create song in database
             const song = await Song.create({
@@ -384,27 +358,15 @@ const seedSongs = async () => {
                 albumIds: []
             });
 
-            console.log(`    ✅ Saved to database (ID: ${song._id})`);
             uploaded++;
 
         } catch (error) {
-            console.error(`    ❌ Error: ${error.message}`);
             failed++;
         }
     }
 
-    console.log('\n' + '═'.repeat(60));
-    console.log('📊 SEED SUMMARY');
-    console.log('═'.repeat(60));
-    console.log(`   ✅ Uploaded:  ${uploaded}`);
-    console.log(`   ⏭️  Skipped:   ${skipped} (already exist)`);
-    console.log(`   ❌ Failed:    ${failed}`);
-    console.log(`   📁 Total:     ${files.length}`);
-    console.log('═'.repeat(60) + '\n');
-
     // Close database connection
     await mongoose.connection.close();
-    console.log('🔌 Database connection closed');
     process.exit(0);
 };
 
