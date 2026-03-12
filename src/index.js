@@ -24,7 +24,8 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'https://spotify-chat-jqzp.onrender.com',
-    'https://drs-music-player.onrender.com'
+    'https://drs-music-player.onrender.com',
+    'https://drs.deenu.fun'
 ];
 
 if (process.env.LOCAL_IP) {
